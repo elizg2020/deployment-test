@@ -1,3 +1,4 @@
+
 # This workflow uses actions that are not certified by GitHub.
 # They are provided by a third-party and are governed by
 # separate terms of service, privacy policy, and support
@@ -33,7 +34,7 @@ env:
   OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
   OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
   # 🖊️ EDIT to set the kube context's namespace after login. Leave blank to use your user's default namespace.
-  OPENSHIFT_NAMESPACE: ""
+  OPENSHIFT_NAMESPACE: ${{ secrets.OPENSHIFT_NAMESPACE }}
 
   # 🖊️ EDIT to set a name for your OpenShift app, or a default one will be generated below.
   APP_NAME: ""
@@ -50,7 +51,7 @@ env:
   IMAGE_REGISTRY_PASSWORD: ${{ secrets.GHCR_TOKEN }}
 
   # 🖊️ EDIT to specify custom tags for the container image, or default tags will be generated below.
-  IMAGE_TAGS: ""
+  IMAGE_TAGS: "1.0.${{ github.run_number }}"
 
 on:
   # https://docs.github.com/en/actions/reference/events-that-trigger-workflows
@@ -139,10 +140,27 @@ jobs:
         insecure_skip_tls_verify: true
         namespace: ${{ env.OPENSHIFT_NAMESPACE }}
 
-    - name: my deployment
+    - name: my deployment 
       run: |
         export IMAGE=${{ steps.push-image.outputs.registry-path }}
+        export OPENSHIFT_NAMESPACE=${{ env.OPENSHIFT_NAMESPACE }}
+        export APP_NAME=${{ env.APP_NAME }}
+
+        
         echo ${{ steps.push-image.outputs.registry-path }}
-        sed -i 's|\${IMAGE}|'"$IMAGE"'|g' pod.yaml
-        oc apply -f pod.yaml
-        oc get pods 
+        sed -i 's|\${IMAGE}|'"$IMAGE"'|g' deployment/deployment.yaml deployment/service.yaml
+        sed -i 's|\${APP_NAME}|'"$APP_NAME"'|g' deployment/deployment.yaml deployment/service.yaml
+        sed -i 's|\${OPENSHIFT_NAMESPACE}|'"$OPENSHIFT_NAMESPACE"'|g' deployment/deployment.yaml deployment/service.yaml
+        oc apply -f deployment/deployment.yaml -f deployment/service.yaml
+        oc get pods
+
+    - name: create route
+      run: | 
+        sed -i 's|\${APP_NAME}|'"$APP_NAME"'|g' deployment/route.yaml
+        sed -i 's|\${OPENSHIFT_NAMESPACE}|'"$OPENSHIFT_NAMESPACE"'|g' deployment/route.yaml
+        oc apply -f deployment/route.yaml
+
+    - name: get route
+      run: | 
+        echo $(oc get route $${{ env.APP_NAME }} -n ${{ env.OPENSHIFT_NAMESPACE }} -o jsonpath='{.spec.host}')
+        
