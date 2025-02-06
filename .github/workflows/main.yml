@@ -17,4 +17,4 @@ jobs:
         run: echo "Hello, World!"
 
       - name: list files
-        run: ls -l
+        run: ls -a
